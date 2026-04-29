@@ -9,11 +9,11 @@
       //let y = nn.random(nn.height)
       let x = nn.mouseX
       let y = nn.mouseY
-      nn.create('div')
-        .content('😀')  
+      nn.create('img')
+        .set('src', 'monalisa.jpeg')  
         .css('user-select', 'none')
         .position(x, y)
-        .scale(2)
+        .scale(0.5)
         .rotate(y)
         .hueRotate(x)
         .addTo('body')
