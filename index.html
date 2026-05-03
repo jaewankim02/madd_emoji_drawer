@@ -1,32 +1,177 @@
-<body></body>
-<script src="https://cdn.jsdelivr.net/gh/netizenorg/netnet-standard-library/build/nn.min.js"></script>
-<script>
-  /* global nn */
+<!DOCTYPE html>
+<html>
+  <head>
+    <style>
+      body {
+        margin: 0;
+        background-color: #111;
+      }
+      #palette {
+        display: flex;
+        flex-direction: row;
+        gap: 12px;
+        padding: 16px;
+        background-color: #222;
+      }
+      .swatch {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border: 3px solid transparent;
+        cursor: pointer;
+      }
+      .swatch.selected {
+        border: 3px solid white;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="palette">
+      <div class="swatch" style="background-color: #FF2D55;"></div>
+      <div class="swatch" style="background-color: #FF6B2B;"></div>
+      <div class="swatch" style="background-color: #FFD700;"></div>
+      <div class="swatch" style="background-color: #39FF14;"></div>
+      <div class="swatch" style="background-color: #0077FF;"></div>
+      <div class="swatch" style="background-color: #8B00FF;"></div>
+      <div class="swatch" style="background-color: #FF69B4;"></div>
+      <div class="swatch" style="background-color: #00CED1;"></div>
+      <div class="swatch" style="background-color: #F0EAD6;"></div>
+      <div class="swatch" style="background-color: #1A1A2E;"></div>
+    </div>
+    <canvas id="canvas"></canvas>
+  </body>
+  <script src="https://cdn.jsdelivr.net/gh/netizenorg/netnet-standard-library/build/nn.min.js"></script>
+  <script>
+    // --- PALETTE LOGIC ---
+    let activeColor = '#FF2D55'
+    const swatches = document.querySelectorAll('.swatch')
+    swatches.forEach(function(swatch) {
+      swatch.addEventListener('click', function() {
+        swatches.forEach(function(s) { s.classList.remove('selected') })
+        swatch.classList.add('selected')
+        activeColor = swatch.style.backgroundColor
+      })
+    })
+    swatches[0].classList.add('selected')
 
-  function draw () {
-    if (nn.mouseDown) {
-      //let x = nn.random(nn.width)
-      //let y = nn.random(nn.height)
-      let x = nn.mouseX
-      let y = nn.mouseY
-      nn.create('img')
-        .set('src', 'monalisa.jpeg')  
-        .css('user-select', 'none')
-        .position(x, y)
-        .scale(0.5)
-        .rotate(y)
-        .hueRotate(x)
-        .addTo('body')
+    // --- CANVAS SETUP ---
+    const canvas = document.getElementById('canvas')
+    const ctx = canvas.getContext('2d')
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight - document.getElementById('palette').offsetHeight
 
+    // --- OIL DROPS ---
+    let drops = []
+    let growTimer = null
+    let activeDrop = null
+
+    function startDrop(x, y) {
+      if (growTimer) {
+        clearInterval(growTimer)
+        growTimer = null
+      }
+
+      drops.forEach(function(drop) {
+        drop.growing = false
+      })
+
+      let newDrop = {
+        x: x,
+        y: y,
+        radius: 5,
+        color: activeColor,
+        growing: true
+      }
+
+      drops.push(newDrop)
+      activeDrop = newDrop
+
+      growTimer = setInterval(function() {
+        if (activeDrop && activeDrop.growing) {
+          // grow the active drop
+          activeDrop.radius += 1.5
+
+          // --- COLLISION RESOLUTION ---
+          // check every pair of drops, not just active vs others
+          // we use two nested loops to compare every possible pair
+          // i goes from 0 to the end
+          // j starts at i+1 so we never compare a drop with itself
+          // and never check the same pair twice
+          for (let i = 0; i < drops.length; i++) {
+            for (let j = i + 1; j < drops.length; j++) {
+              let a = drops[i]
+              let b = drops[j]
+
+              let dx = b.x - a.x
+              let dy = b.y - a.y
+              let distance = Math.sqrt(dx * dx + dy * dy)
+              let overlap = (a.radius + b.radius) - distance
+
+              if (overlap > 0 && distance > 0) {
+                let nx = dx / distance
+                let ny = dy / distance
+
+                // if one of the drops is the active drop,
+                // only push the OTHER one — the active drop holds its position
+                // if neither is active, push both equally
+                if (a === activeDrop) {
+                  b.x += nx * overlap
+                  b.y += ny * overlap
+                } else if (b === activeDrop) {
+                  a.x -= nx * overlap
+                  a.y -= ny * overlap
+                } else {
+                  // push both apart equally by half the overlap each
+                  a.x -= nx * overlap * 0.5
+                  a.y -= ny * overlap * 0.5
+                  b.x += nx * overlap * 0.5
+                  b.y += ny * overlap * 0.5
+                }
+              }
+            }
+          }
+        }
+
+        drawAll()
+      }, 16)
     }
 
-  }
+    function stopDrop() {
+      if (growTimer) {
+        clearInterval(growTimer)
+        growTimer = null
+      }
+      if (activeDrop) {
+        activeDrop.growing = false
+        activeDrop = null
+      }
+    }
 
-  //  nn.times(5000, draw)
-  nn.on('mousemove', draw)
+    function drawAll() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      drops.forEach(function(drop) {
+        ctx.beginPath()
+        ctx.arc(drop.x, drop.y, drop.radius, 0, Math.PI * 2)
+        ctx.fillStyle = drop.color
+        ctx.fill()
+        ctx.closePath()
+      })
+    }
 
+    // --- MOUSE EVENTS ---
+    canvas.addEventListener('mousedown', function(e) {
+      startDrop(e.offsetX, e.offsetY)
+    })
 
+    canvas.addEventListener('mouseup', function() {
+      stopDrop()
+    })
 
-
-  draw()
-</script>
+    canvas.addEventListener('mouseleave', function() {
+      stopDrop()
+    })
+  </script>
+</html>
